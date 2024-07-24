@@ -1,0 +1,553 @@
+let
+    ErlangPack = 
+[
+fn_MinMax = 
+    [
+    function = (Value as number, Minimum as number, Maximum as number)=>
+
+        let
+            MinMax = if Value < Minimum then Minimum else if Value > Maximum then Maximum else Value
+        in
+            MinMax,
+
+    fnType = type function (
+        Value as (type number meta [Documentation.FieldCaption = "Value"]), 
+        Minimum as (type number meta [Documentation.FieldCaption = "Minimum"]), 
+        Maximum as (type number meta [Documentation.FieldCaption = "Maximum"]) 
+        ) as number 
+    meta 
+        [
+        Documentation.Name = "fn_MinMax",
+        Documentation.LongDescription = 
+            "<b>Eng</b> Applies minimum and maximum bounds to a value. Returns: Minimum in the case of Value is less than Minimum, Maximum in the case of Value is greater than Minimum, Value in the case of Value is in range [Minimum; Maximum]<p>
+            <b>Rus</b> Применяет минимальную и максимальную границы к значению. Возвращает: Minimum, если Value меньше Minimum, Maximum, если Value больше Maximum, Value, если Value находится в диапазоне [Minimum; Maximum]",
+        Documentation.Examples = 
+            {[
+            Description = 
+                "Value = 1.65; " &
+                "Minimum = 1; " &
+                "Maximum = 2",
+            Code = "fn_MinMax(1.65, 1, 2)",
+            Result="1,65"
+            ],
+            [
+            Description = 
+                "Value = 1,65; " &
+                "Minimum = 0; " &
+                "Maximum = 1",
+            Code = "fn_MinMax(1.65, 0, 1)",
+            Result="1"
+            ],
+            [
+            Description = 
+                "Value = 1,65; " &
+                "Minimum = 2; " &
+                "Maximum = 3",
+            Code = "fn_MinMax(1.65, 2, 3)",
+            Result="2"
+            ]}
+        ],
+    result = Value.ReplaceType(function, fnType)
+    ][result],
+
+fn_ErlangB = 
+    [
+    function = (Agents as number, Calls as number, AHT as number)=> 
+        
+        let
+            NegativeVars = [Agents = Agents, Calls = Calls, AHT = AHT],
+            Handling =  if Agents < 0 or Calls < 0 or AHT < 0 
+                        then error [Reason = "Variables out of range", Message = "Negative value in variables", Detail = NegativeVars] 
+                        else 
+                let
+                    Intensity = Calls / 3600 * AHT,
+                    Iterations = Number.RoundTowardZero(Agents, 0),
+                    B = List.Accumulate({1..Iterations}, 1, (last, agent)=> (Intensity * last) / (agent + (Intensity * last))),
+                    ErlangB = if AHT = 0 or Calls = 0 then 0 else if Agents = 0 then 1 else fn_MinMax(B, 0, 1)
+                in
+                    ErlangB
+        in 
+            Handling,
+
+    fnType = type function (
+        Agents as (type number meta [Documentation.FieldCaption = "Number of agents"]), 
+        Calls as (type number meta [Documentation.FieldCaption = "Calls per hour"]), 
+        AHT as (type number meta [Documentation.FieldCaption = "Average handling time, seconds"]) 
+        ) as number 
+    meta 
+        [
+        Documentation.Name = "fn_ErlangB",
+        Documentation.LongDescription = 
+            "<b>Eng</b> Calculates the probability of the call being blocked, that is that all the trunks are in use and the caller will receive a busy signal asumming blocked call gets lost and doesn't wait in the queue. Allows fractional values for all arguments.<p>
+            <b>Rus</b> Вычисляет вероятность блокировки вызова, то есть того, что все соединительные линии заняты и вызывающий абонент получит сигнал «занято», предполагая, что заблокированный вызов теряется и не помещается в очередь. Допускает дробные значения всех аргументов.",
+        Documentation.Examples = 
+            {[
+            Description = "<p><b>Eng</b> Calculate service level for the following parameters:<p> 
+                           <b>Rus</b> Рассчитать вероятность блокировки звонка при следующих параметрах:<p>" &
+                "Agents = 100; " &
+                "Calls = 1900; " &
+                "AHT = 180",
+            Code = "fn_ErlangB(100, 1900, 180)",
+            Result="0,0488042061786778"
+            ]}
+        ],
+    result = Value.ReplaceType(function, fnType)
+    ][result],
+
+fn_ErlangBExt = 
+    [
+    function = (Agents as number, Calls as number, AHT as number, Retry as number)=>
+        
+        let
+            NegativeVars = [Agents = Agents, Calls = Calls, AHT = AHT],
+            Handling =  if Agents < 0 or Calls < 0 or AHT < 0 
+                        then error [Reason = "Variables out of range", Message = "Negative value in variables", Detail = NegativeVars] 
+                        else 
+            let
+                Intensity = Calls / 3600 * AHT,
+                Iterations = Number.RoundTowardZero(Agents, 0),
+                Retries = fn_MinMax(Retry, 0, 1),
+                fx_Last = (last, agent)=>
+                    let
+                        BlockingFactor = (Intensity * last)/(agent + Intensity * last),
+                        Attempts = 1/(1-(BlockingFactor * Retries)),
+                        BExt = (Intensity * last * Attempts)/(agent + (Intensity * last * Attempts))
+                    in BExt,
+                BExt = List.Accumulate({1..Iterations}, 1, (last, agent) => fx_Last(last, agent)),
+                ErlangBExt = if AHT = 0 or Calls = 0 then 0 else if Agents = 0 then 1 else fn_MinMax(BExt, 0, 1)
+            in
+                ErlangBExt
+        in 
+            Handling,
+
+    fnType = type function (
+        Agents as (type number meta [Documentation.FieldCaption = "Number of agents"]), 
+        Calls as (type number meta [Documentation.FieldCaption = "Calls per hour"]), 
+        AHT as (type number meta [Documentation.FieldCaption = "Average handling time, seconds"]),
+        Retry as (type number meta [Documentation.FieldCaption = "Retry probability"]) 
+        ) as number 
+    meta 
+        [
+        Documentation.Name = "fn_ErlangBExt",
+        Documentation.LongDescription = 
+            "<b>Eng</b> Calculates the percentage likelyhood of the call being blocked, that is that all the trunks are in use and the caller will receive a busy signal. The Extended version allows input of a percentage figure for those blocked callers who will immediately retry. Allows fractional values for all arguments.<p>
+            <b>Rus</b> Вычисляет вероятность вероятность блокировки вызова, то есть того, что все соединительные линии используются и вызывающий абонент получит сигнал «занято». Расширенная версия позволяет вводить процентное значение для тех заблокированных абонентов, которые немедленно повторят попытку. Допускает дробные значения всех аргументов.",
+        Documentation.Examples = 
+            {[
+            Description = "<p><b>Eng</b> Calculate service level for the following parameters:<p> 
+                           <b>Rus</b> Рассчитать вероятность блокировки звонка при следующих параметрах:<p>" &
+                "Agents = 100; " &
+                "Calls = 1900; " &
+                "AHT = 180; " &
+                "Retry = 0.330564319090233",
+            Code = "fn_ErlangBExt(100, 1900, 180, 0.330564319090233)",
+            Result="0,067998508949570824"
+            ]}
+        ],
+    result = Value.ReplaceType(function, fnType)
+    ][result],
+
+fn_ErlangC = 
+    [
+    function = (Agents as number, Calls as number, AHT as number) =>
+
+        let
+            NegativeVars = [Agents = Agents, Calls = Calls, AHT = AHT],
+            Handling =  if Agents < 0 or Calls < 0 or AHT < 0 
+                        then error [Reason = "Variables out of range", Message = "Negative value in variables", Detail = NegativeVars] 
+                        else 
+            let
+                Intensity = Calls / 3600 * AHT,
+                ErlangB = fn_ErlangB(Agents, Calls, AHT),
+                C = ErlangB / (((Intensity / Agents) * ErlangB) + (1 - (Intensity / Agents))),
+                ErlangC = if AHT = 0 or Calls = 0 then 0 else if Agents = 0 then 1 else fn_MinMax(C, 0, 1)
+            in 
+                ErlangC
+        in 
+            Handling,
+
+    fnType = type function (
+        Agents as (type number meta [Documentation.FieldCaption = "Number of agents"]), 
+        Calls as (type number meta [Documentation.FieldCaption = "Calls per hour"]), 
+        AHT as (type number meta [Documentation.FieldCaption = "Average handling time, seconds"]) 
+        ) as number 
+    meta 
+        [
+        Documentation.Name = "ErlangC",
+        Documentation.LongDescription = 
+            "<b>Eng</b> Calculates the probability of a call queuing, assuming that pending calls remain in the system until they can be processed. Allows fractional values for all arguments.<p>
+            <b>Rus</b> Вычисляет вероятность постановки звонка в очередь, предполагая, что неотвеченные вызовы остаются в системе до тех пор, пока их не удастся обработать. Допускает дробные значения всех аргументов.",
+        Documentation.Examples = 
+            {[
+            Description = "<p><b>Eng</b> Calculate the probability of queuing a call with the following parameters:<p> 
+                           <b>Rus</b> Рассчитать вероятность постановки звонка в очередь при следующих параметрах:<p>" &
+                "Agents = 100; " &
+                "Calls = 1900; " &
+                "AHT = 180",
+            Code = "fn_ErlangC(100, 1900, 180)",
+            Result="0,50645685391302031"
+            ]}
+        ],
+    result = Value.ReplaceType(function, fnType)
+    ][result],
+
+fn_ServiceLevel = 
+    [
+    function = (Agents as number, ServiceTime as number , Calls as number, AHT as number)=>
+
+        let
+            Intensity = Calls / 3600 * AHT,
+            C = fn_ErlangC(Agents, Calls, AHT),
+            SLQueued = 1 - C * Number.Exp((Intensity - Agents) * ServiceTime / AHT),
+            SLA = fn_MinMax(SLQueued, 0, 1)
+        in
+            SLA,
+
+    fnType = type function (
+        Agents as (type number meta [Documentation.FieldCaption = "Number of agents"]), 
+        ServiceTime as (type number meta [Documentation.FieldCaption = "Service time, seconds"]), 
+        Calls as (type number meta [Documentation.FieldCaption = "Calls per hour"]), 
+        AHT as (type number meta [Documentation.FieldCaption = "Average handling time, seconds"]) 
+        ) as number 
+    meta 
+        [
+        Documentation.Name = "fn_ServiceLevel",
+        Documentation.LongDescription = 
+            "<b>Eng</b> Calculates service level for the given parameters. Allows fractional values for all arguments.<p>
+            <b>Rus</b> Рассчитывает уровень сервиса при заданных параметрах. Допускает дробные значения всех аргументов.",
+        Documentation.Examples = 
+            {[
+            Description = "<p><b>Eng</b> Calculate service level for the following parameters:<p> 
+                           <b>Rus</b> Рассчитать уровень сервиса при следующих параметрах:<p>" &
+                "Agents = 100; " &
+                "ServiceTime = 45; " &
+                "Calls = 1900; " &
+                "AHT = 180",
+            Code = "fn_ServiceLevel(100, 45, 1900, 180)",
+            Result="0,85489768195119908"
+            ]}
+        ],
+    result = Value.ReplaceType(function, fnType)
+    ][result],
+
+fn_Agents = 
+    [
+    function = (ServiceLevel as number, ServiceTime as number, Calls as number, AHT as number)=>
+
+        let
+            SL = fn_MinMax(ServiceLevel, 0, 1),    // Cut Service level value between 0 and 1
+            Iterations = List.Generate(()=> [agents = 0, sl = 0], each [sl] <= SL, each [agents = [agents] + 1, sl = fn_ServiceLevel(agents, ServiceTime, Calls, AHT)], each [agents]),
+            Agents = if Calls = 0 or AHT = 0 then 0 else List.Last(Iterations) + 1
+        in
+            Agents,
+
+    fnType = type function (
+        ServiceLevel as (type number meta [Documentation.FieldCaption = "Target service level"]), 
+        ServiceTime as (type number meta [Documentation.FieldCaption = "Service time, seconds"]), 
+        Calls as (type number meta [Documentation.FieldCaption = "Calls per hour"]), 
+        AHT as (type number meta [Documentation.FieldCaption = "Average handling time, seconds"]) 
+        ) as number 
+    meta [
+        Documentation.Name = "fn_Agents",
+        Documentation.LongDescription = 
+            "<b>Eng</b> Calculates the minimum number of agents required to meet the target service level. Allows fractional values for all arguments. The result returnes as an integer.<p>
+            <b>Rus</b> Рассчитывает минимальное количество агентов, необходимое для достижения целевого уровня сервиса. Допускает дробные значения всех аргументов. Результат возвращается в  виде целого числа",
+        Documentation.Examples = 
+            {[
+            Description = "<p><b>Eng</b> Calculate the required number of agents with the following parameters:<p> 
+                           <b>Rus</b> Рассчитать необходимое количество агентов при следующих параметрах:<p>" &
+                "ServiceLevel = 0,8; " &
+                "ServiceTime = 45; " &
+                "Calls = 1900; " &
+                "AHT = 180",
+            Code = "fn_Agents(0.8, 45, 1900, 180)",
+            Result="100"
+            ]}
+        ],
+    result = Value.ReplaceType(function, fnType)
+    ][result],
+
+fn_FractionalAgents = 
+    [
+    function = (ServiceLevel, ServiceTime, Calls, AHT)=>
+
+        let
+            SL = fn_MinMax(ServiceLevel, 0, 1),    // Cut SLA value between 0 and 1
+            AgentsMax = fn_Agents(SL, ServiceTime, Calls, AHT),    // Minimum integer number of agents required to meet the target service level
+            AgentsMin = AgentsMax - 1,    // Maxnimum integer number of agents required not to meet the target service level
+            slMin = fn_ServiceLevel(AgentsMin, ServiceTime, Calls, AHT),    // Service level at AgentsMin 
+            slMax = fn_ServiceLevel(AgentsMax, ServiceTime, Calls, AHT),    // Service level at AgentsMax 
+            slAgentDiff = slMax - slMin,    // Impact of the last agent on the service (SLA difference made by last 1 agent)
+            slNeedDiff = SL - slMin,    // SLA difference we want
+            FractionalAgents = if Calls = 0 or AHT = 0 then 0 else (slNeedDiff/slAgentDiff) + (AgentsMin)
+        in
+            FractionalAgents,
+
+    fnType = type function (
+        ServiceLevel as (type number meta [Documentation.FieldCaption = "Target service level"]), 
+        ServiceTime as (type number meta [Documentation.FieldCaption = "Service time, seconds"]), 
+        Calls as (type number meta [Documentation.FieldCaption = "Calls per hour"]), 
+        AHT as (type number meta [Documentation.FieldCaption = "Average handling time, seconds"]) 
+        ) as number 
+    meta [
+        Documentation.Name = "fn_FractionalAgents",
+        Documentation.LongDescription = 
+            "<b>Eng</b> Calculates the exact number of agents required to achieve a target service level. Allows fractional values for all arguments.<p>
+            <b>Rus</b> Рассчитывает точное количество агентов, необходимое для достижения целевого уровня сервиса. Допускает дробные значения всех аргументов",
+        Documentation.Examples = 
+            {[
+            Description = "<p><b>Eng</b> Calculate service level for the following parameters:<p> 
+                           <b>Rus</b> Рассчитать необходимое количество агентов при следующих параметрах:<p>" &
+                "ServiceLevel = 0.8; " &
+                "ServiceTime = 45; " &
+                "Calls = 1900; " &
+                "AHT = 180",
+            Code = "fn_FractionalAgents(0.8, 45, 1900, 180)",
+            Result="99,219336353617123"
+            ]}
+
+        ],
+    result = Value.ReplaceType(function, fnType)
+    ][result],
+
+fn_AbandonRate = 
+    [
+    function = (Agents as number, AbandonTime as number, Calls as number, AHT as number)=>
+
+        let
+            Intensity = Calls / 3600 * AHT,
+            C = fn_ErlangC(Agents, Calls, AHT),
+            Abandon = C * Number.Exp((Intensity - Agents)*(AbandonTime / AHT)),
+            AbandonRate = fn_MinMax(Abandon, 0, 1)
+        in
+            AbandonRate,
+
+    fnType = type function (
+        Agents as (type number meta [Documentation.FieldCaption = "Number of agents"]), 
+        AbandonTime as (type number meta [Documentation.FieldCaption = "Time to abandon, seconds"]), 
+        Calls as (type number meta [Documentation.FieldCaption = "Calls per hour"]), 
+        AHT as (type number meta [Documentation.FieldCaption = "Average handling time, seconds"]) 
+        ) as number 
+    meta [
+        Documentation.Name = "fn_AbandonRate",
+        Documentation.LongDescription = 
+            "<b>Eng</b> Calculates the percentage of calls that will remain in the queue for more than a specified time. Allows fractional values for all arguments.<p>
+            <b>Rus</b> Рассчитывает процент вызовов, которые будут находиться в очереди больше заданного времени. Допускает дробные значения всех аргументов.",
+        Documentation.Examples = 
+            {[
+            Description = "<p><b>Eng</b> Calculate abandon rate with the following parameters:<p> 
+                           <b>Rus</b> Рассчитать долю несвоевременно принятых звонков при следующих параметрах:<p>" &
+                "Agents = 100; " &
+                "AbandonTime = 45; " &
+                "Calls = 1900; " &
+                "AHT = 180",
+            Code = "fn_AbandonRate(100, 45, 1900, 180)",
+            Result="0,14510231804880086"
+            ]}
+        ],
+    result = Value.ReplaceType(function, fnType)
+    ][result],
+
+fn_AverageWaitTime = 
+    [
+    function = (Agents as number, Calls as number, AHT as number)=>
+
+        let
+            Intensity = Calls / 3600 * AHT,
+            Utilization = fn_MinMax(Intensity / Agents, 0, 0.99),    // 0.99 - Crutch for Utz >= 1, because WaitTime contains 1-Utz in denominator. Value 0.99 is the best approximation for it.
+            C = fn_ErlangC(Agents, Calls, AHT),
+            WaitTime = C / (Agents * 3600/AHT * (1 - Utilization)) * 3600
+        in
+            WaitTime,
+
+
+    fnType = type function (
+        Agents as (type number meta [Documentation.FieldCaption = "Number of agents"]), 
+        Calls as (type number meta [Documentation.FieldCaption = "Calls per hour"]), 
+        AHT as (type number meta [Documentation.FieldCaption = "Average handling time, seconds"]) 
+        ) as number 
+    meta 
+        [
+        Documentation.Name = "fn_AverageWaitTime",
+        Documentation.LongDescription = 
+            "<b>Eng</b> Calculates the average time all calls spent in the queue. Allows fractional values for all arguments.<p>
+            <b>Rus</b> Вычисляет среднее время нахождения всех звонков в очереди. Допускает дробные значения всех аргументов.",
+        Documentation.Examples = 
+            {[
+            Description = "<p><b>Eng</b> Calculate average wait time for the following parameters:<p> 
+                           <b>Rus</b> Рассчитать среднее время ожидания ответа при следующих параметрах:<p>" &
+                "Agents = 100; " &
+                "Calls = 1900; " &
+                "AHT = 180",
+            Code = "fn_AverageWaitTime(100, 1900, 180)",
+            Result="18,232446740868717"
+            ]}
+        ],
+    result = Value.ReplaceType(function, fnType)
+    ][result],
+
+fn_CallCapacity = 
+[
+    function = (Agents as number, ServiceLevel as number, ServiceTime as number, AHT as number)=>
+        
+        let
+            Handling =  if AHT = 0 
+                        then error [Reason = "Variables out of range", Message = "division by zero", Detail = "AHT = 0"] 
+                        else 
+            let
+                xNoAgent = Number.RoundTowardZero(Agents, 0),
+                Calls = xNoAgent / AHT * 3600,
+                xAgent = fn_Agents(ServiceLevel, ServiceTime, Calls, AHT),
+                Iterations = List.Generate(
+                    ()=> [calls = Calls, agents = xAgent],
+                    each [agents] > xNoAgent,
+                    each [calls = [calls] - 1, agents = fn_FractionalAgents(ServiceLevel, ServiceTime, [calls], AHT)],
+                    each [calls]),
+                CallCapacity = List.Last(Iterations)
+            in
+                CallCapacity
+        in
+            Handling,
+
+    fnType = type function (
+        Agents as (type number meta [Documentation.FieldCaption = "Number of agents"]), 
+        ServiceLevel as (type number meta [Documentation.FieldCaption = "Target service level"]), 
+        ServiceTime as (type number meta [Documentation.FieldCaption = "Service time, seconds"]), 
+        AHT as (type number meta [Documentation.FieldCaption = "Average handling time, seconds"]) 
+        ) as number 
+    meta [
+        Documentation.Name = "fn_CallCapacity",
+        Documentation.LongDescription = 
+            "<b>Eng</b> Calculates the number of calls which can be handled by the given number of agents whilst still achieving the grade of service. Allows fractional values for all arguments<p>
+            <b>Rus</b> Рассчитывает количество вызовов, которые могут быть обработаны заданным количеством агентов, сохраняя при этом уровень обслуживания. Допускает дробные значения всех аргументов",
+        Documentation.Examples = 
+            {[
+            Description = "<p><b>Eng</b> Calculate the number of calls that operators can answer for the following parameters:<p> 
+                           <b>Rus</b> Рассчитать количество звонков, которые могут принять операторы при следующих параметрах:<p>" &
+                "Agents = 100; " &
+                "ServiceLevel = 0.8; " &
+                "ServiceTime = 45; " &
+                "AHT = 180",
+            Code = "fn_CallCapacity(100, 0.8, 45, 180)",
+            Result="1916"
+            ]}
+
+        ],
+    result = Value.ReplaceType(function, fnType)
+    ][result],
+
+fn_QueueSize = 
+    [
+    function = (Agents as number, Calls as number, AHT as number) =>
+
+        let
+            Intensity = Calls / 3600 * AHT,
+            Utilization = fn_MinMax(Intensity/Agents, 0, 0.99),    // 0.99 - Crutch for Utz >= 1, because AnswerTime contains 1-Utz in denominator. Value 0.99 is the best approximation for it.
+            ErlangB = fn_ErlangB(Agents, Calls, AHT),
+            C = ErlangB / (((Intensity / Agents) * ErlangB) + (1 - (Intensity / Agents))),
+            ErlangC = if (Agents < 0) or (Intensity < 0) then 0 else fn_MinMax(C, 0, 1),
+            QueueSize = if Agents = 0 then Calls/2 else (Utilization * ErlangC) / (1 - Utilization)
+        in 
+            QueueSize,
+
+    fnType = type function (
+        Agents as (type number meta [Documentation.FieldCaption = "Number of agents"]), 
+        Calls as (type number meta [Documentation.FieldCaption = "Calls per hour"]), 
+        AHT as (type number meta [Documentation.FieldCaption = "Average handling time, seconds"]) 
+        ) as number 
+    meta 
+        [
+        Documentation.Name = "fn_QueueSize",
+        Documentation.LongDescription = 
+            "<b>Eng</b> Calculates the average queue size. Allows fractional values for all arguments.<p>
+            <b>Rus</b> Рассчитывает среднюю величину очереди. Допускает дробные значения всех аргументов.",
+        Documentation.Examples = 
+            {[
+            Description = "<p><b>Eng</b> Calculate the average queue size for the following parameters:<p> 
+                           <b>Rus</b> Рассчитать среднюю величину очереди при следующих параметрах:<p>" &
+                "Agents = 100; " &
+                "Calls = 1900; " &
+                "AHT = 180",
+            Code = "fn_QueueSize(100, 1900, 180)",
+            Result="9,622680224347377"
+            ]}
+        ],
+    result = Value.ReplaceType(function, fnType)
+    ][result],
+
+fn_QueueTime = 
+    [
+    function = (Agents as number, Calls as number, AHT as number) =>
+
+        let
+            Intensity = Calls / 3600 * AHT,
+            Utilization = fn_MinMax(Intensity/Agents, 0, 0.99),    // 0.99 - Crutch for Utz >= 1, because AnswerTime contains 1-Utz in denominator. Value 0.99 is the best approximation for it.
+            QueueTime = if AHT = 0 then 0 else 1 / (Agents * 3600 / AHT * (1 - Utilization)) * 3600
+        in 
+        QueueTime,
+
+    fnType = type function (
+        Agents as (type number meta [Documentation.FieldCaption = "Number of agents"]), 
+        Calls as (type number meta [Documentation.FieldCaption = "Calls per hour"]), 
+        AHT as (type number meta [Documentation.FieldCaption = "Average handling time, seconds"]) 
+        ) as number 
+    meta 
+        [
+        Documentation.Name = "fn_QueueTime",
+        Documentation.LongDescription = 
+            "<b>Eng</b> Calculates the average queue time for those calls which will queue. Allows fractional values for all arguments.<p>
+            <b>Rus</b> Рассчитывает среднее время ожидания для тех вызовов, которые попадут в очередь. Допускает дробные значения всех аргументов.",
+        Documentation.Examples = 
+            {[
+            Description = "<p><b>Eng</b> Calculate the average queue time for the following parameters:<p> 
+                           <b>Rus</b> Рассчитать среднее время нахождения в очереди при следующих параметрах:<p>" &
+                "Agents = 100; " &
+                "Calls = 1900; " &
+                "AHT = 180",
+            Code = "fn_QueueTime(100, 1900, 180)",
+            Result="35,999999999999972"
+            ]}
+        ],
+    result = Value.ReplaceType(function, fnType)
+    ][result],
+
+fn_ServiceTime = 
+    [
+    function = (Agents as number, ServiceLevel as number, Calls as number, AHT as number) =>
+
+        let
+            QueueTime = fn_QueueTime(Agents, Calls, AHT),
+            ErlangC = fn_ErlangC(Agents, Calls, AHT),
+            ServiceTime = if ErlangC <= 0.01 then 0 else QueueTime * (1 - ((1 - ServiceLevel) / ErlangC))    // 0.01 - Crutch for small ErlangC value, because ServiceTime contains ErlangC in denominator. Value 0.01 is the best approximation for it.
+        in 
+            ServiceTime,
+
+    fnType = type function (
+        Agents as (type number meta [Documentation.FieldCaption = "Number of agents"]), 
+        ServiceLevel as (type number meta [Documentation.FieldCaption = "Service level"]), 
+        Calls as (type number meta [Documentation.FieldCaption = "Calls per hour"]), 
+        AHT as (type number meta [Documentation.FieldCaption = "Average handling time, seconds"]) 
+        ) as number 
+    meta 
+        [
+        Documentation.Name = "fn_ServiceTime",
+        Documentation.LongDescription = 
+            "<b>Eng</b> Calculates the average waiting time in which a given percentage of the calls will be answered. Allows fractional values for all arguments.<p>
+            <b>Rus</b> Рассчитывает среднее время ожидания, в течение которого будет отвечен определенный процент вызовов. Допускает дробные значения всех аргументов.",
+        Documentation.Examples = 
+            {[
+            Description = "<p><b>Eng</b> Calculate the service time for the following parameters:<p> 
+                           <b>Rus</b> Рассчитать сервисное время при следующих параметрах:<p>" &
+                "Agents = 100; " &
+                "ServiceLevel = 0.8; " &
+                "Calls = 1900; " &
+                "AHT = 180",
+            Code = "fn_ServiceTime(100, 0.80, 1900, 180)",
+            Result="21,783586608867282"
+            ]}
+        ],
+    result = Value.ReplaceType(function, fnType)
+    ][result]
+]
+in
+    ErlangPack
