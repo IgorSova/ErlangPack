@@ -1,6 +1,6 @@
 # ErlangC_Pack
 A set of Erlang C functions for contact centers and any industries related to queues handling.<p>
-Набор функций Эрланга для контакт-центров а также любых отраслей, связанных с обслуживанием очередей.
+Набор функций Эрланга для контакт-центров а также любых отраслей, связанных с обслуживанием очередей.<p>
 <b>fn_MinMax</b><p>
 <b>Eng</b> Supporting function. Applies minimum and maximum bounds to a value. Returns: Minimum in the case of Value is less than Minimum, Maximum in the case of Value is greater than Minimum, Value in the case of Value is in range [Minimum; Maximum].<p>
 <b>Rus</b> Вспомогательная функцияю Применяет минимальную и максимальную границы к значению. Возвращает: Minimum, если Value меньше Minimum, Maximum, если Value больше Maximum, Value, если Value находится в диапазоне [Minimum; Maximum].<p>
