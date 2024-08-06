@@ -40,6 +40,9 @@ A set of Erlang C functions for contact centers and any industries related to qu
 <b>fn_ServiceTime</b><p>
 <b>Eng</b> Calculates the average waiting time in which a given percentage of the calls will be answered. Allows fractional values for all arguments.<p>
 <b>Rus</b> Рассчитывает среднее время ожидания, в течение которого будет отвечен определенный процент вызовов. Допускает дробные значения всех аргументов.<p>
+<b>fn_Occupancy</b><p>
+<b>Eng</b> Calculates occupancy for a given number of agents at a given load. Allows fractional values for all arguments.<p>
+<b>Rus</b> Рассчитывает загруженность для заданного количества агентов при заданной нагрузке. Допускает дробные значения всех аргументов.<p>
 
 <b>Relations between functions<p>
 ![Functions relations](https://github.com/IgorSova/ErlangPack/blob/main/Functions%20Relations.png)
