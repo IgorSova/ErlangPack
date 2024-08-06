@@ -547,6 +547,47 @@ fn_ServiceTime =
             ]}
         ],
     result = Value.ReplaceType(function, fnType)
+    ][result],
+fn_Occupancy = 
+    [
+    function = (Agents as number, Calls as number, AHT as number)=> 
+        
+        let
+            NegativeVars = [Agents = Agents, Calls = Calls, AHT = AHT],
+            Handling =  if Agents < 0 or Calls < 0 or AHT < 0 
+                        then error [Reason = "Variables out of range", Message = "Negative value in variables", Detail = NegativeVars] 
+                        else 
+                let
+                    Intensity = Calls / 3600 * AHT,
+                    Occupancy = fn_MinMax(Intensity/Agents, 0, 1)
+                in
+                    Occupancy
+        in 
+            Handling,
+
+    fnType = type function (
+        Agents as (type number meta [Documentation.FieldCaption = "Number of agents"]), 
+        Calls as (type number meta [Documentation.FieldCaption = "Calls per hour"]), 
+        AHT as (type number meta [Documentation.FieldCaption = "Average handling time, seconds"]) 
+        ) as number 
+    meta 
+        [
+        Documentation.Name = "fn_Occupancy",
+        Documentation.LongDescription = 
+            "<b>Eng</b> Calculates occupancy for a given number of agents at a given load. Allows fractional values for all arguments.<p>
+            <b>Rus</b> Рассчитывает загруженность для заданного количества агентов при заданной нагрузке. Допускает дробные значения всех аргументов.",
+        Documentation.Examples = 
+            {[
+            Description = "<p><b>Eng</b> Calculate occupancy for the following parameters:<p> 
+                           <b>Rus</b> Рассчитать загруженность операторов при следующих параметрах:<p>" &
+                "Agents = 175; " &
+                "Calls = 1900; " &
+                "AHT = 180",
+            Code = "fn_Occupancy(175, 1900, 180)",
+            Result="0,95238095238095233"
+            ]}
+        ],
+    result = Value.ReplaceType(function, fnType)
     ][result]
 ]
 in
